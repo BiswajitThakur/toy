@@ -1,8 +1,10 @@
+#![allow(clippy::type_complexity)]
+
 use std::{
     collections::HashMap,
     io::{self, BufReader, BufWriter},
-    net::{TcpListener, TcpStream, ToSocketAddrs},
-    sync::Arc,
+    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
+    sync::{Arc, RwLock},
 };
 
 use crate::{request::HttpRequest, response::HttpResponse, server::HttpServer};
@@ -10,7 +12,7 @@ use crate::{request::HttpRequest, response::HttpResponse, server::HttpServer};
 macro_rules! insert_handler {
     ($name:ident) => {
         #[inline]
-        pub fn $name<F>(&mut self, path: &'static str, f: F)
+        pub fn $name<F>(&self, path: &'static str, f: F)
         where
             F: Fn(
                     HttpRequest<BufReader<TcpStream>>,
@@ -20,7 +22,7 @@ macro_rules! insert_handler {
                 + Sync
                 + 'static,
         {
-            self.$name.insert(path, Box::new(f));
+            self.$name.write().unwrap().insert(path, Box::new(f));
         }
     };
 }
@@ -30,75 +32,103 @@ where
     R: io::Read,
     W: io::Write,
 {
-    pub(crate) middleware: Vec<
-        Box<
-            dyn Fn(
-                    HttpRequest<R>,
-                    HttpResponse<W>,
-                ) -> io::Result<Option<(HttpRequest<R>, HttpResponse<W>)>>
-                + Send
-                + Sync
-                + 'static,
+    pub(crate) middleware: RwLock<
+        Vec<
+            Box<
+                dyn Fn(
+                        HttpRequest<R>,
+                        HttpResponse<W>,
+                    ) -> io::Result<Option<(HttpRequest<R>, HttpResponse<W>)>>
+                    + Send
+                    + Sync
+                    + 'static,
+            >,
         >,
     >,
-    pub(crate) connect: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) connect: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) get: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) get: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) post: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) post: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) delete: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) delete: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) head: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) head: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) put: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) put: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) patch: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) patch: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) trace: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) trace: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) options: HashMap<
-        &'static str,
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) options: RwLock<
+        HashMap<
+            &'static str,
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
-    pub(crate) unknown: Option<
-        Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+    pub(crate) unknown: RwLock<
+        Option<
+            Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
+        >,
     >,
+}
+
+impl Default for App<BufReader<TcpStream>, BufWriter<TcpStream>> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl App<BufReader<TcpStream>, BufWriter<TcpStream>> {
     pub fn new() -> Self {
         Self {
-            middleware: Vec::new(),
-            connect: HashMap::new(),
-            get: HashMap::new(),
-            post: HashMap::new(),
-            delete: HashMap::new(),
-            head: HashMap::new(),
-            put: HashMap::new(),
-            patch: HashMap::new(),
-            trace: HashMap::new(),
-            options: HashMap::new(),
-            unknown: None,
+            middleware: RwLock::new(Vec::new()),
+            connect: RwLock::new(HashMap::new()),
+            get: RwLock::new(HashMap::new()),
+            post: RwLock::new(HashMap::new()),
+            delete: RwLock::new(HashMap::new()),
+            head: RwLock::new(HashMap::new()),
+            put: RwLock::new(HashMap::new()),
+            patch: RwLock::new(HashMap::new()),
+            trace: RwLock::new(HashMap::new()),
+            options: RwLock::new(HashMap::new()),
+            unknown: RwLock::new(None),
         }
     }
-    pub fn use_middleware<F>(&mut self, f: F)
+    pub fn use_middleware<F>(&self, f: F)
     where
         F: Fn(
                 HttpRequest<BufReader<TcpStream>>,
@@ -112,7 +142,7 @@ impl App<BufReader<TcpStream>, BufWriter<TcpStream>> {
             + Sync
             + 'static,
     {
-        self.middleware.push(Box::new(f));
+        self.middleware.write().unwrap().push(Box::new(f));
     }
     insert_handler!(connect);
     insert_handler!(get);
@@ -123,8 +153,13 @@ impl App<BufReader<TcpStream>, BufWriter<TcpStream>> {
     insert_handler!(patch);
     insert_handler!(trace);
     insert_handler!(options);
-    pub fn run<A: ToSocketAddrs>(self, addr: A) -> io::Result<()> {
+    pub fn listen<A: ToSocketAddrs, F: Fn(SocketAddr)>(
+        self,
+        addr: A,
+        callback: F,
+    ) -> io::Result<()> {
         let listener = TcpListener::bind(addr)?;
+        callback(listener.local_addr().unwrap());
         let server = HttpServer {
             listener,
             handler: Arc::new(self),

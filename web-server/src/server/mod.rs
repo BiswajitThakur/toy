@@ -44,7 +44,7 @@ fn handle_stream(
     let res_strean = Arc::new(Mutex::new(BufWriter::new(stream)));
     let mut req = get_req(Arc::new(Mutex::new(BufReader::new(req_stream)))).unwrap();
     let mut res = HttpResponse::new(res_strean.clone());
-    for f in handler.middleware.iter() {
+    for f in handler.middleware.read().unwrap().iter() {
         match f(req, res) {
             Ok(Some((r, s))) => {
                 req = r;
@@ -60,84 +60,66 @@ fn handle_stream(
     }
     match &req.method {
         Method::Connect => {
-            if let Some(f) = handler.connect.get(req.path.as_str()) {
+            if let Some(f) = handler.connect.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Get => {
-            if let Some(f) = handler.get.get(req.path.as_str()) {
+            if let Some(f) = handler.get.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Post => {
-            if let Some(f) = handler.post.get(req.path.as_str()) {
+            if let Some(f) = handler.post.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Delete => {
-            if let Some(f) = handler.delete.get(req.path.as_str()) {
+            if let Some(f) = handler.delete.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Head => {
-            if let Some(f) = handler.head.get(req.path.as_str()) {
+            if let Some(f) = handler.head.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Put => {
-            if let Some(f) = handler.put.get(req.path.as_str()) {
+            if let Some(f) = handler.put.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Patch => {
-            if let Some(f) = handler.patch.get(req.path.as_str()) {
+            if let Some(f) = handler.patch.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Trace => {
-            if let Some(f) = handler.trace.get(req.path.as_str()) {
+            if let Some(f) = handler.trace.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
         Method::Options => {
-            if let Some(f) = handler.options.get(req.path.as_str()) {
+            if let Some(f) = handler.options.read().unwrap().get(req.path.as_str()) {
                 f(req, res)?;
-            } else {
-                if let Some(not_found) = &handler.unknown {
-                    not_found(req, res)?;
-                }
+            } else if let Some(not_found) = &handler.unknown.read().unwrap().as_ref() {
+                not_found(req, res)?;
             }
         }
     }
