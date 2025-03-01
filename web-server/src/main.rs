@@ -5,8 +5,13 @@ use web_server::App;
 fn main() -> io::Result<()> {
     let mut app = App::new();
 
+    app.use_middleware(|mut req, res| {
+        req.insert("hello".to_owned(), "World".to_owned());
+        Ok(Some((req, res)))
+    });
+
     app.get("/", |req, _res| {
-        println!("{:#?}", req.header);
+        println!("{:#?}", req.get_header());
         println!("Req Got: /");
         Ok(())
     });

@@ -7,10 +7,10 @@ use std::{
 use crate::{error::HttpError, method::Method};
 
 pub struct HttpRequest<R> {
-    pub method: Method,
-    pub path: String,
-    pub version: String,
-    pub header: HashMap<String, String>,
+    pub(crate) method: Method,
+    pub(crate) path: String,
+    pub(crate) version: String,
+    pub(crate) header: HashMap<String, String>,
     reader: R,
 }
 
@@ -38,5 +38,13 @@ impl<R: io::Read> HttpRequest<R> {
             header,
             reader: r,
         }
+    }
+    #[inline]
+    pub fn insert(&mut self, key: String, value: String) {
+        self.header.insert(key, value);
+    }
+    #[inline]
+    pub fn get_header(&self) -> &HashMap<String, String> {
+        &self.header
     }
 }
