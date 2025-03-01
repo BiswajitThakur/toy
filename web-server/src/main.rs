@@ -6,13 +6,19 @@ fn main() -> io::Result<()> {
     let mut app = App::new();
 
     app.use_middleware(|mut req, res| {
-        req.insert("hello".to_owned(), "World".to_owned());
+        req.insert_header("hello".to_owned(), "World".to_owned());
         Ok(Some((req, res)))
     });
 
     app.get("/", |req, _res| {
-        println!("{:#?}", req.get_header());
+        println!("{:#?}", req.get_headers());
         println!("Req Got: /");
+        Ok(())
+    });
+
+    app.post("/", |req, _res| {
+        println!("{:#?}", req.get_headers());
+        println!("Req Post: /");
         Ok(())
     });
 

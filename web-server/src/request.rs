@@ -1,11 +1,8 @@
-use std::{
-    collections::HashMap,
-    io::{self, BufRead, BufReader, Read},
-    ops::Deref,
-};
+use std::{collections::HashMap, io, ops::Deref};
 
-use crate::{error::HttpError, method::Method};
+use crate::method::Method;
 
+#[allow(unused)]
 pub struct HttpRequest<R> {
     pub(crate) method: Method,
     pub(crate) path: String,
@@ -13,8 +10,6 @@ pub struct HttpRequest<R> {
     pub(crate) header: HashMap<String, String>,
     reader: R,
 }
-
-// unsafe impl<R> std::marker::Send for HttpRequest<R> {}
 
 impl<R> Deref for HttpRequest<R> {
     type Target = HashMap<String, String>;
@@ -40,11 +35,11 @@ impl<R: io::Read> HttpRequest<R> {
         }
     }
     #[inline]
-    pub fn insert(&mut self, key: String, value: String) {
+    pub fn insert_header(&mut self, key: String, value: String) {
         self.header.insert(key, value);
     }
     #[inline]
-    pub fn get_header(&self) -> &HashMap<String, String> {
+    pub fn get_headers(&self) -> &HashMap<String, String> {
         &self.header
     }
 }

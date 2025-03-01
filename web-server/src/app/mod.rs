@@ -7,6 +7,24 @@ use std::{
 
 use crate::{request::HttpRequest, response::HttpResponse, server::HttpServer};
 
+macro_rules! insert_handler {
+    ($name:ident) => {
+        #[inline]
+        pub fn $name<F>(&mut self, path: &'static str, f: F)
+        where
+            F: Fn(
+                    HttpRequest<BufReader<TcpStream>>,
+                    HttpResponse<BufWriter<TcpStream>>,
+                ) -> io::Result<()>
+                + Send
+                + Sync
+                + 'static,
+        {
+            self.$name.insert(path, Box::new(f));
+        }
+    };
+}
+
 pub struct App<R, W>
 where
     R: io::Read,
@@ -96,18 +114,15 @@ impl App<BufReader<TcpStream>, BufWriter<TcpStream>> {
     {
         self.middleware.push(Box::new(f));
     }
-    pub fn get<F>(&mut self, path: &'static str, f: F)
-    where
-        F: Fn(
-                HttpRequest<BufReader<TcpStream>>,
-                HttpResponse<BufWriter<TcpStream>>,
-            ) -> io::Result<()>
-            + Send
-            + Sync
-            + 'static,
-    {
-        self.get.insert(path, Box::new(f));
-    }
+    insert_handler!(connect);
+    insert_handler!(get);
+    insert_handler!(post);
+    insert_handler!(delete);
+    insert_handler!(head);
+    insert_handler!(put);
+    insert_handler!(patch);
+    insert_handler!(trace);
+    insert_handler!(options);
     pub fn run<A: ToSocketAddrs>(self, addr: A) -> io::Result<()> {
         let listener = TcpListener::bind(addr)?;
         let server = HttpServer {

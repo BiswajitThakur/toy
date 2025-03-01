@@ -1,5 +1,6 @@
-use std::{collections::HashMap, io};
+use std::collections::HashMap;
 
+#[allow(unused)]
 pub struct HttpResponse<W> {
     status: u32,
     header: HashMap<String, String>,
