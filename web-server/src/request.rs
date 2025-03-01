@@ -25,28 +25,18 @@ impl<R> Deref for HttpRequest<R> {
 
 impl<R: io::Read> HttpRequest<R> {
     pub fn new(
-        (method, path, version): (Method, String, String),
-        mut r: R,
-    ) -> Result<Self, HttpError> {
-        let mut reader = BufReader::new(&mut r);
-        let mut header = HashMap::new();
-        for line in reader.by_ref().lines() {
-            println!("mmmmmmmmmmm");
-            let line = line?;
-            println!(">>> {}", &line);
-            if line.trim().is_empty() {
-                break;
-            }
-            if let Some((key, value)) = line.split_once(":") {
-                header.insert(key.trim().to_owned(), value.trim().to_owned());
-            }
-        }
-        Ok(Self {
+        method: Method,
+        path: String,
+        version: String,
+        header: HashMap<String, String>,
+        r: R,
+    ) -> Self {
+        Self {
             method,
             path,
             version,
             header,
             reader: r,
-        })
+        }
     }
 }

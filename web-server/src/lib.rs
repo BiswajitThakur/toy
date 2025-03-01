@@ -5,7 +5,7 @@ mod response;
 
 use std::{
     collections::HashMap,
-    io::{self, BufRead, BufReader, BufWriter},
+    io::{self, BufRead, BufReader, BufWriter, Read},
     net::{TcpListener, TcpStream, ToSocketAddrs},
     str::FromStr,
     sync::Arc,
@@ -17,11 +17,14 @@ use method::Method;
 use request::HttpRequest;
 use response::HttpResponse;
 
-pub struct HandlerFn<R, W>
+pub struct App<R, W>
 where
     R: io::Read,
     W: io::Write,
 {
+    /*
+    middleware:
+        Vec<Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>>,*/
     connect: HashMap<
         &'static str,
         Box<dyn Fn(HttpRequest<R>, HttpResponse<W>) -> io::Result<()> + Send + Sync + 'static>,
@@ -63,7 +66,7 @@ where
     >,
 }
 
-impl HandlerFn<BufReader<TcpStream>, BufWriter<TcpStream>> {
+impl App<BufReader<TcpStream>, BufWriter<TcpStream>> {
     pub fn new() -> Self {
         Self {
             connect: HashMap::new(),
@@ -101,17 +104,17 @@ impl HandlerFn<BufReader<TcpStream>, BufWriter<TcpStream>> {
     }
 }
 
-pub struct HttpServer<R, W>
+struct HttpServer<R, W>
 where
     R: io::Read,
     W: io::Write,
 {
     listener: TcpListener,
-    handler: Arc<HandlerFn<R, W>>,
+    handler: Arc<App<R, W>>,
 }
 
 impl HttpServer<BufReader<TcpStream>, BufWriter<TcpStream>> {
-    pub fn run(self) {
+    fn run(self) {
         let handler = self.handler;
         for stream in self.listener.incoming() {
             match stream {
@@ -129,18 +132,16 @@ impl HttpServer<BufReader<TcpStream>, BufWriter<TcpStream>> {
 }
 
 fn handle_stream(
-    handler: Arc<HandlerFn<BufReader<TcpStream>, BufWriter<TcpStream>>>,
+    handler: Arc<App<BufReader<TcpStream>, BufWriter<TcpStream>>>,
     stream: TcpStream,
 ) -> io::Result<()> {
-    let mut reader = BufReader::new(stream.try_clone().unwrap());
+    let req_stream = stream.try_clone().unwrap();
     let writer = BufWriter::new(stream);
-    let (method, path, version) = get_first_line(reader.get_mut()).unwrap();
-    let req = HttpRequest::new((method.clone(), path.clone(), version), reader).unwrap();
-    println!("++++++++++");
+    let req = get_req(req_stream).unwrap();
     let res = HttpResponse::new(writer);
-    match method {
+    match &req.method {
         Method::Connect => {
-            if let Some(f) = handler.connect.get(path.as_str()) {
+            if let Some(f) = handler.connect.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -149,7 +150,7 @@ fn handle_stream(
             }
         }
         Method::Get => {
-            if let Some(f) = handler.get.get(path.as_str()) {
+            if let Some(f) = handler.get.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -158,7 +159,7 @@ fn handle_stream(
             }
         }
         Method::Post => {
-            if let Some(f) = handler.post.get(path.as_str()) {
+            if let Some(f) = handler.post.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -167,7 +168,7 @@ fn handle_stream(
             }
         }
         Method::Delete => {
-            if let Some(f) = handler.delete.get(path.as_str()) {
+            if let Some(f) = handler.delete.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -176,7 +177,7 @@ fn handle_stream(
             }
         }
         Method::Head => {
-            if let Some(f) = handler.head.get(path.as_str()) {
+            if let Some(f) = handler.head.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -185,7 +186,7 @@ fn handle_stream(
             }
         }
         Method::Put => {
-            if let Some(f) = handler.put.get(path.as_str()) {
+            if let Some(f) = handler.put.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -194,7 +195,7 @@ fn handle_stream(
             }
         }
         Method::Patch => {
-            if let Some(f) = handler.patch.get(path.as_str()) {
+            if let Some(f) = handler.patch.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -203,7 +204,7 @@ fn handle_stream(
             }
         }
         Method::Trace => {
-            if let Some(f) = handler.trace.get(path.as_str()) {
+            if let Some(f) = handler.trace.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -212,7 +213,7 @@ fn handle_stream(
             }
         }
         Method::Options => {
-            if let Some(f) = handler.options.get(path.as_str()) {
+            if let Some(f) = handler.options.get(req.path.as_str()) {
                 f(req, res)?;
             } else {
                 if let Some(not_found) = &handler.unknown {
@@ -223,18 +224,27 @@ fn handle_stream(
     }
     Ok(())
 }
-fn get_first_line<W: io::Read>(reader: W) -> Result<(Method, String, String), HttpError> {
-    let mut lines = BufReader::new(reader).lines();
-    let first_line = match lines.next() {
+fn get_req<W: io::Read>(reader: W) -> Result<HttpRequest<BufReader<W>>, HttpError> {
+    let mut reader = BufReader::new(reader);
+    let first_line = match reader.by_ref().lines().next() {
         Some(Ok(line)) => line,
         Some(Err(err)) => return Err(err.into()),
         None => return Err(HttpError::BadRequest),
     };
-    println!(">> {}", &first_line);
     let mut iter = first_line.split_whitespace();
     let method = iter.next().unwrap_or_default();
     let method = Method::from_str(method)?;
     let path = iter.next().unwrap_or_default().to_owned();
     let version = iter.next().unwrap_or_default().to_owned();
-    Ok((method, path, version))
+    let mut header = HashMap::new();
+    for line in reader.by_ref().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some((key, value)) = line.split_once(":") {
+            header.insert(key.trim().to_owned(), value.trim().to_owned());
+        }
+    }
+    Ok(HttpRequest::new(method, path, version, header, reader))
 }
