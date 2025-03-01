@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
-    io,
+    fmt, io,
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -16,7 +17,7 @@ pub struct HttpResponse<W> {
 impl<W> From<Arc<Mutex<W>>> for HttpResponse<W> {
     fn from(value: Arc<Mutex<W>>) -> Self {
         Self {
-            status: Mutex::new(Status::OK),
+            status: Mutex::new(Status::default()),
             header: HashMap::new(),
             writer: value,
         }
@@ -26,7 +27,7 @@ impl<W> From<Arc<Mutex<W>>> for HttpResponse<W> {
 impl<W> HttpResponse<W> {
     pub fn new(w: Arc<Mutex<W>>) -> Self {
         Self {
-            status: Mutex::new(Status::OK),
+            status: Mutex::new(Status::default()),
             header: HashMap::new(),
             writer: w,
         }
@@ -38,6 +39,12 @@ impl<W> HttpResponse<W> {
     pub fn status(&self, status: Status) -> &Self {
         *self.status.lock().unwrap() = status;
         self
+    }
+    pub fn send<T: fmt::Display>(&self, value: T) -> io::Result<()> {
+        todo!()
+    }
+    pub fn send_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+        todo!()
     }
 }
 

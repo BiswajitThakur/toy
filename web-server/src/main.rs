@@ -15,6 +15,7 @@ fn main() -> io::Result<()> {
         println!("Req Got: /");
 
         res.status(Status::OK);
+        res.send("Hello World")?;
         Ok(())
     });
 

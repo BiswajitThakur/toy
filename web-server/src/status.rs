@@ -1,12 +1,13 @@
 use std::fmt;
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Status {
     Continue,
     SwitchingProtocols,
     Processing,
     EarlyHints,
+    #[default]
     OK,
     Created,
     Accepted,
