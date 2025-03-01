@@ -13,9 +13,7 @@ fn main() -> io::Result<()> {
     app.get("/", |req, res| {
         println!("{:#?}", req.get_headers());
         println!("Req Got: /");
-
-        res.status(Status::OK);
-        res.send("Hello World")?;
+        res.status(Status::OK).send("Hello World")?;
         Ok(())
     });
 
