@@ -1,4 +1,9 @@
-use std::{collections::HashMap, io, ops::Deref};
+use std::{
+    collections::HashMap,
+    io,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
 use crate::method::Method;
 
@@ -8,7 +13,7 @@ pub struct HttpRequest<R> {
     pub(crate) path: String,
     pub(crate) version: String,
     pub(crate) header: HashMap<String, String>,
-    reader: R,
+    reader: Arc<Mutex<R>>,
 }
 
 impl<R> Deref for HttpRequest<R> {
@@ -18,13 +23,20 @@ impl<R> Deref for HttpRequest<R> {
     }
 }
 
+impl<R> HttpRequest<R> {
+    #[allow(unused)]
+    pub(crate) fn get_inner(self) -> Arc<Mutex<R>> {
+        self.reader
+    }
+}
+
 impl<R: io::Read> HttpRequest<R> {
     pub fn new(
         method: Method,
         path: String,
         version: String,
         header: HashMap<String, String>,
-        r: R,
+        r: Arc<Mutex<R>>,
     ) -> Self {
         Self {
             method,

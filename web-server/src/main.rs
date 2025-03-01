@@ -1,6 +1,6 @@
 use std::io;
 
-use web_server::App;
+use web_server::{App, Status};
 
 fn main() -> io::Result<()> {
     let mut app = App::new();
@@ -10,9 +10,11 @@ fn main() -> io::Result<()> {
         Ok(Some((req, res)))
     });
 
-    app.get("/", |req, _res| {
+    app.get("/", |req, res| {
         println!("{:#?}", req.get_headers());
         println!("Req Got: /");
+
+        res.status(Status::OK);
         Ok(())
     });
 

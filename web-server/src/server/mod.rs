@@ -3,7 +3,7 @@ use std::{
     io::{self, BufRead, BufReader, BufWriter, Read},
     net::{TcpListener, TcpStream},
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread,
 };
 
@@ -41,9 +41,9 @@ fn handle_stream(
     stream: TcpStream,
 ) -> io::Result<()> {
     let req_stream = stream.try_clone().unwrap();
-    let writer = BufWriter::new(stream);
-    let mut req = get_req(req_stream).unwrap();
-    let mut res = HttpResponse::new(writer);
+    let res_strean = Arc::new(Mutex::new(BufWriter::new(stream)));
+    let mut req = get_req(Arc::new(Mutex::new(BufReader::new(req_stream)))).unwrap();
+    let mut res = HttpResponse::new(res_strean.clone());
     for f in handler.middleware.iter() {
         match f(req, res) {
             Ok(Some((r, s))) => {
@@ -143,8 +143,11 @@ fn handle_stream(
     }
     Ok(())
 }
-fn get_req<W: io::Read>(reader: W) -> Result<HttpRequest<BufReader<W>>, HttpError> {
-    let mut reader = BufReader::new(reader);
+fn get_req<W: io::Read>(
+    r: Arc<Mutex<BufReader<W>>>,
+) -> Result<HttpRequest<BufReader<W>>, HttpError> {
+    let cloned_r = r.clone();
+    let mut reader = cloned_r.lock().unwrap();
     let first_line = match reader.by_ref().lines().next() {
         Some(Ok(line)) => line,
         Some(Err(err)) => return Err(err.into()),
@@ -165,5 +168,5 @@ fn get_req<W: io::Read>(reader: W) -> Result<HttpRequest<BufReader<W>>, HttpErro
             header.insert(key.trim().to_owned(), value.trim().to_owned());
         }
     }
-    Ok(HttpRequest::new(method, path, version, header, reader))
+    Ok(HttpRequest::new(method, path, version, header, r))
 }
